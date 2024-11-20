@@ -1,39 +1,24 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+// 导入必要的组件和主题
+import { Slot } from "expo-router"; // 从expo-router导入Slot组件用于路由
+import { PaperProvider, MD3DarkTheme } from "react-native-paper"; // 导入Paper UI组件库的Provider和暗色主题
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+// 自定义主题配置
+const theme = {
+  ...MD3DarkTheme, // 继承MD3暗色主题的所有属性
+  colors: {
+    ...MD3DarkTheme.colors, // 继承原有的颜色配置
+    primary: "#00999B", // 自定义主色调为青色
+    background: "#000000", // 自定义背景色为黑色
+  },
+};
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
+// 根布局组件
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <PaperProvider theme={theme}>
+      {" "}
+      {/* 使用PaperProvider包裹整个应用,并传入自定义主题 */}
+      <Slot /> {/* Slot组件用于渲染子路由页面 */}
+    </PaperProvider>
   );
 }
