@@ -52,7 +52,7 @@ export default function DrawerLayout() {
         }}
       />
       {/* 工作信息路由 */}
-      <Drawer.Screen
+      {/* <Drawer.Screen
         name="workinfo"
         options={{
           drawerLabel: "工作信息",
@@ -61,18 +61,7 @@ export default function DrawerLayout() {
             <Ionicons name="briefcase-outline" size={24} color={color} />
           ),
         }}
-      />
-      {/* 自动打卡路由 */}
-      <Drawer.Screen
-        name="auto"
-        options={{
-          drawerLabel: "自动打卡",
-          title: "自动打卡",
-          drawerIcon: ({ color }) => (
-            <Ionicons name="timer-outline" size={24} color={color} />
-          ),
-        }}
-      />
+      /> */}
 
       {/* 数据统计路由 */}
       <Drawer.Screen

@@ -1,10 +1,10 @@
 import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
 
-export default function AutoScreen() {
+export default function FeedbackScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>自动打卡</Text>
+      <Text style={styles.text}>反馈建议</Text>
     </View>
   );
 }

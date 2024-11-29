@@ -37,20 +37,14 @@ export default function CustomDrawerContent(
               <Text style={styles.userTag}>PRO</Text>
             </View>
           </View>
-          <Pressable
-            style={styles.settingsButton}
-            onPress={() => router.push("/settings")}
-          >
-            <Ionicons name="settings-outline" size={22} color="#E0E0E0" />
-          </Pressable>
         </View>
         {/* 设置按钮 */}
-        {/* <Pressable
-            style={styles.settingsButton}
-            onPress={() => router.push("/settings")}
-          >
-            <Ionicons name="settings-outline" size={22} color="#E0E0E0" />
-          </Pressable> */}
+        <Pressable
+          style={styles.settingsButton}
+          onPress={() => router.push("/settings")}
+        >
+          <Ionicons name="settings-outline" size={22} color="#E0E0E0" />
+        </Pressable>
       </View>
 
       {/* 抽屉菜单列表 - 使用默认的DrawerItemList渲染菜单项 */}

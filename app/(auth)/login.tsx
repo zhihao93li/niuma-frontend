@@ -11,7 +11,8 @@ import {
 } from "react-native-paper"; // Material Design 风格的 UI 组件库
 import { Link, router } from "expo-router"; // 用于页面导航和路由管理
 // import { useSocialAuth } from "../../hooks/useSocialAuth"; // 社交账号登录相关 hook
-// import { useAuthStore } from "../../stores/useAuthStore"; // 认证状态管理 hook
+import { useAuthStore } from "../../stores/auth";
+import * as SecureStore from "expo-secure-store";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 // 定义登录表单的数据结构接口
@@ -34,8 +35,42 @@ export default function LoginScreen() {
   const [error, setError] = useState(""); // 存储错误信息文本
   const [showPassword, setShowPassword] = useState(false);
 
-  // 从认证store中获取登录方法
+  // 从 auth store 中获取 login 方法
   const { login } = useAuthStore();
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+
+      if (!username || !password) {
+        setError("请输入手机号和密码");
+        setVisible(true);
+        return;
+      }
+
+      if (username === "111" && password === "111") {
+        const mockResponse = {
+          token: "mock-token",
+          user: {
+            id: 1,
+            name: username,
+          },
+        };
+
+        await login(mockResponse.token, mockResponse.user);
+        // login 函数会自动处理路由跳转
+      } else {
+        setError("手机号或密码错误");
+        setVisible(true);
+      }
+    } catch (error) {
+      setError("登录失败，请重试");
+      setVisible(true);
+      console.error("Login failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /**
    * 处理登录逻辑
@@ -44,45 +79,45 @@ export default function LoginScreen() {
    * 3. 处理登录结果
    * 4. 错误处理
    */
-  const handleLogin = async () => {
-    try {
-      setLoading(true); // 开始加载,禁用登录按钮
+  // const handleLogin = async () => {
+  //   try {
+  //     setLoading(true); // 开始加载,禁用登录按钮
 
-      // 验证输入是否完整
-      if (!username || !password) {
-        setError("请输入手机号和密码");
-        setVisible(true);
-        return;
-      }
+  //     // 验证输入是否完整
+  //     if (!username || !password) {
+  //       setError("请输入手机号和密码");
+  //       setVisible(true);
+  //       return;
+  //     }
 
-      // 模拟API调用 - 验证固定的测试账号(用户名密码都是111)
-      if (username === "111" && password === "111") {
-        // 模拟成功响应数据
-        const mockResponse = {
-          token: "mock-token", // JWT token
-          user: {
-            id: 1,
-            name: username,
-          },
-        };
+  //     // 模拟API调用 - 验证固定的测试账号(用户名密码都是111)
+  //     if (username === "111" && password === "111") {
+  //       // 模拟成功响应数据
+  //       const mockResponse = {
+  //         token: "mock-token", // JWT token
+  //         user: {
+  //           id: 1,
+  //           name: username,
+  //         },
+  //       };
 
-        // 调用登录方法,保存token和用户信息到全局状态
-        await login(mockResponse.token, mockResponse.user);
-        // 登录成功后会自动跳转到主页
-      } else {
-        // 登录失败处理
-        setError("手机号或密码错误");
-        setVisible(true);
-      }
-    } catch (error) {
-      // 异常处理(网络错误等)
-      setError("登录失败，请重试");
-      setVisible(true);
-      console.error("Login failed:", error);
-    } finally {
-      setLoading(false); // 结束加载状态
-    }
-  };
+  //       // 调用登录方法,保存token和用户信息到全局状态
+  //       await login(mockResponse.token, mockResponse.user);
+  //       // 登录成功后会自动跳转到主页
+  //     } else {
+  //       // 登录失败处理
+  //       setError("手机号或密码错误");
+  //       setVisible(true);
+  //     }
+  //   } catch (error) {
+  //     // 异常处理(网络错误等)
+  //     setError("登录失败，请重试");
+  //     setVisible(true);
+  //     console.error("Login failed:", error);
+  //   } finally {
+  //     setLoading(false); // 结束加载状态
+  //   }
+  // };
 
   return (
     <View style={styles.container}>
@@ -149,6 +184,7 @@ export default function LoginScreen() {
           loading={loading} // 显示加载动画
           disabled={loading} // 加载时禁用按钮
           buttonColor="#00999B" // 按钮颜色
+          textColor="#ffffff"
         >
           {loading ? "登录中..." : "登录"}
         </Button>
@@ -224,10 +260,25 @@ export default function LoginScreen() {
 // 样式定义
 const styles = StyleSheet.create({
   container: {
-    flex: 1, // 占满整个屏幕
-    padding: 16,
-    justifyContent: "center",
-    backgroundColor: "#000000", // 黑色背景
+    flex: 1,
+    elevation: 5, // 为 Android 添加阴影
+    ...(Platform.OS === "ios"
+      ? {
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: 2,
+          },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+        }
+      : {}),
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.25)",
+        }
+      : {}),
+    backgroundColor: "#1C1C1C",
   },
   title: {
     fontSize: 26,
@@ -235,20 +286,30 @@ const styles = StyleSheet.create({
     color: "#ffffff", // 白色文字
     marginLeft: 30,
     position: "absolute", // 绝对定位
-    top: 100,
+    top: 130,
     fontFamily: "monospace", // 等宽字体
   },
   form: {
     padding: 20,
-    // 阴影效果
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5, // Android阴影效果
+    // 替换原来的 shadow 相关样式
+    ...(Platform.OS === "ios"
+      ? {
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: 2,
+          },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+        }
+      : {}),
+    ...(Platform.OS === "web"
+      ? {
+          boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.25)",
+        }
+      : {}),
+    elevation: 5, // Android 阴影效果
+    marginTop: 250,
   },
   input: {
     marginBottom: 16, // 输入框底部间距

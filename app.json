@@ -8,6 +8,7 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -19,13 +20,15 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff",
-        "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+        "permissions": [
+          "ACCESS_COARSE_LOCATION",
+          "ACCESS_FINE_LOCATION"
+        ]
       }
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
@@ -49,7 +52,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "允许使用您的位置信息进行自动打卡"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
