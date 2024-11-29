@@ -1,4 +1,3 @@
-// 导入必要的React和React Native组件
 import { useState, useEffect } from "react";
 import {
   View,
@@ -10,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -33,6 +33,11 @@ const WEEKDAYS = [
   { id: "SUN", label: "SUN" }, // 周日
 ];
 
+// 定义存储键
+const STORAGE_KEYS = {
+  WORK_SETTINGS: "workSettings",
+};
+
 /**
  * 工作信息屏幕组件
  * 用于显示和管理用户的工作日设置
@@ -45,83 +50,162 @@ export default function WorkinfoScreen() {
     fetchWorkSettings();
   }, []);
 
+  // 格式化时间为 HH:mm 格式
+  const formatTime = (date: Date) => {
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  // 解析服务器返回的时间
+  const parseServerTime = (timeString: string) => {
+    try {
+      const date = new Date(timeString);
+      if (isNaN(date.getTime())) {
+        throw new Error("Invalid date");
+      }
+      return date;
+    } catch (error) {
+      console.error("Error parsing time:", timeString, error);
+      // 返回默认时间
+      const defaultDate = new Date();
+      defaultDate.setHours(9, 0, 0);
+      return defaultDate;
+    }
+  };
+
+  // 保存设置到本地存储
+  const saveSettingsToStorage = async (settings: any) => {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.WORK_SETTINGS,
+        JSON.stringify(settings)
+      );
+    } catch (error) {
+      console.error("Error saving settings to storage:", error);
+    }
+  };
+
+  // 从本地存储获取设置
+  const getSettingsFromStorage = async () => {
+    try {
+      const settings = await AsyncStorage.getItem(STORAGE_KEYS.WORK_SETTINGS);
+      return settings ? JSON.parse(settings) : null;
+    } catch (error) {
+      console.error("Error getting settings from storage:", error);
+      return null;
+    }
+  };
+
+  // 获取设置
   const fetchWorkSettings = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      setIsLoading(true);
 
-      const response = await fetch(
-        "https://apifoxmock.com/m1/5436882-5111963-default/api/users/settings",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+      // 从本地存储获取设置
+      const savedSettings = await getSettingsFromStorage();
+      console.log("Loaded settings from storage:", savedSettings);
+
+      if (savedSettings) {
+        // 设置日薪
+        if (savedSettings.ratedDailySalary) {
+          setSalary(savedSettings.ratedDailySalary.toString());
         }
-      );
 
-      const data = await response.json();
-      if (data.success && data.user) {
-        // 设置初始值
-        setSalary(data.user.ratedDailySalary.toString());
+        // 设置工作日
+        if (Array.isArray(savedSettings.workDays)) {
+          setSelectedDays(new Set(savedSettings.workDays));
+        }
 
-        // 设置上班时间
-        const startTimeDate = new Date();
-        const [startHours, startMinutes] =
-          data.user.ratedWorkStartTime.split(":");
-        startTimeDate.setHours(parseInt(startHours), parseInt(startMinutes), 0);
-        setStartTime(startTimeDate);
-        setTempStartTime(startTimeDate);
+        // 设置工作时间
+        if (
+          savedSettings.ratedWorkStartTime &&
+          savedSettings.ratedWorkEndTime
+        ) {
+          try {
+            // 解析时间字符串 (HH:mm 格式)
+            const [startHours, startMinutes] =
+              savedSettings.ratedWorkStartTime.split(":");
+            const [endHours, endMinutes] =
+              savedSettings.ratedWorkEndTime.split(":");
 
-        // 设置下班时间
-        const endTimeDate = new Date();
-        const [endHours, endMinutes] = data.user.ratedWorkEndTime.split(":");
-        endTimeDate.setHours(parseInt(endHours), parseInt(endMinutes), 0);
-        setEndTime(endTimeDate);
-        setTempEndTime(endTimeDate);
+            const newStartTime = new Date();
+            newStartTime.setHours(
+              parseInt(startHours),
+              parseInt(startMinutes),
+              0
+            );
+            setStartTime(newStartTime);
+            setTempStartTime(newStartTime);
+
+            const newEndTime = new Date();
+            newEndTime.setHours(parseInt(endHours), parseInt(endMinutes), 0);
+            setEndTime(newEndTime);
+            setTempEndTime(newEndTime);
+          } catch (error) {
+            console.error("Error parsing saved times:", error);
+            // 使用默认时间
+            const defaultStartTime = new Date();
+            defaultStartTime.setHours(9, 0, 0);
+            setStartTime(defaultStartTime);
+            setTempStartTime(defaultStartTime);
+
+            const defaultEndTime = new Date();
+            defaultEndTime.setHours(18, 0, 0);
+            setEndTime(defaultEndTime);
+            setTempEndTime(defaultEndTime);
+          }
+        }
+
+        setIsModified(false);
+      } else {
+        // 使用默认值
+        const defaultStartTime = new Date();
+        defaultStartTime.setHours(9, 0, 0);
+        setStartTime(defaultStartTime);
+        setTempStartTime(defaultStartTime);
+
+        const defaultEndTime = new Date();
+        defaultEndTime.setHours(18, 0, 0);
+        setEndTime(defaultEndTime);
+        setTempEndTime(defaultEndTime);
+
+        setSelectedDays(new Set(["MON", "TUE", "WED", "THU", "FRI"]));
+        setSalary("0");
       }
     } catch (error) {
-      Alert.alert("错误", "获取工作信息失败");
+      console.error("Fetch settings error:", error);
+      Alert.alert(
+        "错误",
+        error instanceof Error ? error.message : "获取工作信息失败"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // 保存设置
   const handleSave = async () => {
-    if (!isModified) return;
-
     try {
       setIsLoading(true);
       const token = await AsyncStorage.getItem("userToken");
 
       if (!token) {
-        console.log("No token found");
         router.push("/login");
         return;
       }
 
-      // 验证薪资值
-      if (!salary || isNaN(parseFloat(salary))) {
-        Alert.alert("错误", "请输入有效的薪资金额");
-        return;
-      }
-
-      // 将 Set 转换为数组
-      const workDaysArray = Array.from(selectedDays);
-
-      // 构建请求数据
       const requestData = {
         ratedDailySalary: parseFloat(salary),
         ratedWorkStartTime: formatTime(startTime),
         ratedWorkEndTime: formatTime(endTime),
-        workDays: workDaysArray,
+        workDays: Array.from(selectedDays),
       };
-      console.log("Saving settings:", requestData);
 
-      // 使用实际的 API 地址
+      // 保存到本地存储
+      await saveSettingsToStorage(requestData);
+
+      // Mock API 调用（因为返回随机数据，我们主要使用本地存储的数据）
       const response = await fetch(
         "https://apifoxmock.com/m1/5436882-5111963-default/api/users/settings",
         {
@@ -135,29 +219,21 @@ export default function WorkinfoScreen() {
       );
 
       const data = await response.json();
-      console.log("Server response:", data);
 
-      if (data.success) {
-        setIsModified(false);
-        Alert.alert("成功", "工作信息已设置");
-      } else {
-        throw new Error(data.message || "保存失败");
-      }
+      // 使用本地保存的数据而不是服务器返回的数据
+      setIsModified(false);
+      Alert.alert("成功", "工作设置已更新", [
+        {
+          text: "确定",
+          onPress: () => router.back(),
+        },
+      ]);
     } catch (error) {
       console.error("Save settings error:", error);
-
-      // 更详细的错误提示
-      if (
-        error instanceof TypeError &&
-        error.message === "Network request failed"
-      ) {
-        Alert.alert("网络错误", "请检查网络连接后重试");
-      } else {
-        Alert.alert(
-          "错误",
-          error instanceof Error ? error.message : "保存失败，请重试"
-        );
-      }
+      Alert.alert(
+        "错误",
+        error instanceof Error ? error.message : "保存失败，请重试"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +244,10 @@ export default function WorkinfoScreen() {
     const regex = /^\d*\.?\d{0,2}$/;
     if (regex.test(text) || text === "") {
       const numValue = parseFloat(text);
-      if (text === "" || (numValue > 0 && !isNaN(numValue))) {
+      if (
+        text === "" ||
+        (numValue > 0 && numValue <= 1000000 && !isNaN(numValue))
+      ) {
         setSalary(text);
         setIsModified(true);
       }
@@ -224,7 +303,7 @@ export default function WorkinfoScreen() {
   // 时间选择器状态
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [startTime, setStartTime] = useState(() => {
-    // 从本地存储或API获取上次选择的时间，这里先用默认值
+    // 从本地存储或API获取上次选的时间，这里先用默认值
     const defaultTime = new Date();
     defaultTime.setHours(9, 0, 0); // 设置默认时间 09:00
     return defaultTime;
@@ -262,13 +341,6 @@ export default function WorkinfoScreen() {
   // 临时存储选择的时间
   const [tempStartTime, setTempStartTime] = useState(startTime);
   const [tempEndTime, setTempEndTime] = useState(endTime);
-
-  // 格式化时间显示
-  const formatTime = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
 
   // 取消时间选择
   const handleCancel = (isStartTime: boolean) => {
@@ -336,7 +408,7 @@ export default function WorkinfoScreen() {
   const handleSalaryBlur = () => {
     const numValue = parseFloat(salary);
     // 如果不是正数（包括0、负数或非数字），清空输入
-    if (isNaN(numValue) || numValue <= 0) {
+    if (isNaN(numValue) || numValue <= 0 || numValue > 1000000) {
       setSalary("");
     } else {
       // 格式化为固定的两位小数
@@ -353,134 +425,145 @@ export default function WorkinfoScreen() {
       }}
     >
       <View style={styles.container}>
-        <ThemedText style={styles.title}>工作信息</ThemedText>
-        {/* 添加返回按钮 */}
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>X</Text>
-        </TouchableOpacity>
-
-        {/* 添加保存按钮 */}
-        <TouchableOpacity
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={isLoading || !isModified}
-        >
-          <ThemedText
-            style={[
-              styles.saveButtonText,
-              (!isModified || isLoading) && styles.saveButtonTextDisabled,
-            ]}
-          >
-            保存
-          </ThemedText>
-        </TouchableOpacity>
-        {/* 工作日选择容器 */}
-        <Text style={styles.sectionTitle}>选择每周上班天数</Text>
-        <View style={styles.weekContainer}>
-          {/* 遍历渲染每个工作日按钮 */}
-          {WEEKDAYS.map((day) => (
-            <Pressable
-              key={day.id}
-              style={[
-                styles.dayButton,
-                selectedDays.has(day.id) && styles.selectedDay, // 选中状态样式
-              ]}
-              onPress={() => toggleDay(day.id)}
-            >
-              <Text
-                style={[
-                  styles.dayText,
-                  selectedDays.has(day.id) && styles.selectedDayText, // 选中状态文本样式
-                ]}
-              >
-                {day.label}
-              </Text>
-              <View style={styles.iconContainer}>
-                {selectedDays.has(day.id) ? (
-                  <MaterialCommunityIcons
-                    name="cow"
-                    size={16}
-                    color="#FFFFFF"
-                  />
-                ) : (
-                  <MaterialCommunityIcons
-                    name="face-man-shimmer-outline"
-                    size={16}
-                    color="#7F7F7F"
-                  />
-                )}
-              </View>
-            </Pressable>
-          ))}
-        </View>
-        {/* 上班时间选择 */}
-        <Text style={styles.sectionTitle}>选择上下班时间</Text>
-        <TouchableRipple onPress={() => setShowStartPicker(true)}>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>上班时间</Text>
-            <View style={styles.timeValue}>
-              <Text style={styles.timeText}>{formatTime(startTime)}</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
-            </View>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00999B" />
           </View>
-        </TouchableRipple>
-        {/* 下班时间选择 */}
-        <TouchableRipple onPress={() => setShowEndPicker(true)}>
-          <View style={styles.timeRow}>
-            <Text style={styles.timeLabel}>下班时间</Text>
-            <View style={styles.timeValue}>
-              <Text style={styles.timeText}>{formatTime(endTime)}</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
-            </View>
-          </View>
-        </TouchableRipple>
-        {/* 时间选择器 */}
-        {Platform.OS === "ios" ? (
-          <>
-            {showStartPicker && renderIOSPicker(true)}
-            {showEndPicker && renderIOSPicker(false)}
-          </>
         ) : (
           <>
-            {showStartPicker && (
-              <DateTimePicker
-                value={startTime}
-                mode="time"
-                is24Hour={true}
-                display="default"
-                onChange={onStartTimeChange}
-              />
+            <ThemedText style={styles.title}>工作信息</ThemedText>
+            {/* 添加返回按钮 */}
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Text style={styles.backButtonText}>X</Text>
+            </TouchableOpacity>
+
+            {/* 添加保存按钮 */}
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                isLoading && styles.saveButtonDisabled,
+              ]}
+              onPress={handleSave}
+              disabled={isLoading || !isModified}
+            >
+              <ThemedText
+                style={[
+                  styles.saveButtonText,
+                  (!isModified || isLoading) && styles.saveButtonTextDisabled,
+                ]}
+              >
+                保存
+              </ThemedText>
+            </TouchableOpacity>
+            {/* 工作日选择容器 */}
+            <Text style={styles.sectionTitle}>选择每周上班天数</Text>
+            <View style={styles.weekContainer}>
+              {/* 遍历渲染每个工作日按钮 */}
+              {WEEKDAYS.map((day) => (
+                <Pressable
+                  key={day.id}
+                  style={[
+                    styles.dayButton,
+                    selectedDays.has(day.id) && styles.selectedDay, // 选中状态样式
+                  ]}
+                  onPress={() => toggleDay(day.id)}
+                >
+                  <Text
+                    style={[
+                      styles.dayText,
+                      selectedDays.has(day.id) && styles.selectedDayText, // 选中状态文本样式
+                    ]}
+                  >
+                    {day.label}
+                  </Text>
+                  <View style={styles.iconContainer}>
+                    {selectedDays.has(day.id) ? (
+                      <MaterialCommunityIcons
+                        name="cow"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                    ) : (
+                      <MaterialCommunityIcons
+                        name="face-man-shimmer-outline"
+                        size={16}
+                        color="#7F7F7F"
+                      />
+                    )}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+            {/* 上班时间选择 */}
+            <Text style={styles.sectionTitle}>选择上下班时间</Text>
+            <TouchableRipple onPress={() => setShowStartPicker(true)}>
+              <View style={styles.timeRow}>
+                <Text style={styles.timeLabel}>上班时间</Text>
+                <View style={styles.timeValue}>
+                  <Text style={styles.timeText}>{formatTime(startTime)}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </View>
+              </View>
+            </TouchableRipple>
+            {/* 下班时间选择 */}
+            <TouchableRipple onPress={() => setShowEndPicker(true)}>
+              <View style={styles.timeRow}>
+                <Text style={styles.timeLabel}>下班时间</Text>
+                <View style={styles.timeValue}>
+                  <Text style={styles.timeText}>{formatTime(endTime)}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
+                </View>
+              </View>
+            </TouchableRipple>
+            {/* 时间选择器 */}
+            {Platform.OS === "ios" ? (
+              <>
+                {showStartPicker && renderIOSPicker(true)}
+                {showEndPicker && renderIOSPicker(false)}
+              </>
+            ) : (
+              <>
+                {showStartPicker && (
+                  <DateTimePicker
+                    value={startTime}
+                    mode="time"
+                    is24Hour={true}
+                    display="default"
+                    onChange={onStartTimeChange}
+                  />
+                )}
+                {showEndPicker && (
+                  <DateTimePicker
+                    value={endTime}
+                    mode="time"
+                    is24Hour={true}
+                    display="default"
+                    onChange={onEndTimeChange}
+                  />
+                )}
+              </>
             )}
-            {showEndPicker && (
-              <DateTimePicker
-                value={endTime}
-                mode="time"
-                is24Hour={true}
-                display="default"
-                onChange={onEndTimeChange}
+            {/* 输入月薪 */}
+            <Text style={styles.sectionTitle}>输入月薪</Text>
+            <View style={styles.timeRow}>
+              <Text style={styles.timeLabel}>月薪</Text>
+              <TextInput
+                style={[
+                  styles.salaryInput,
+                  isSalaryFocused && styles.salaryInputFocused,
+                ]}
+                value={salary}
+                onChangeText={handleSalaryChange}
+                onBlur={handleSalaryBlur}
+                onFocus={() => setIsSalaryFocused(true)}
+                keyboardType="decimal-pad"
+                placeholder="请输入月薪"
+                placeholderTextColor="#666"
+                caretHidden={!isSalaryFocused}
               />
-            )}
+            </View>
           </>
         )}
-        {/* 输入月薪 */}
-        <Text style={styles.sectionTitle}>输入月薪</Text>
-        <View style={styles.timeRow}>
-          <Text style={styles.timeLabel}>月薪</Text>
-          <TextInput
-            style={[
-              styles.salaryInput,
-              isSalaryFocused && styles.salaryInputFocused,
-            ]}
-            value={salary}
-            onChangeText={handleSalaryChange}
-            onBlur={handleSalaryBlur}
-            onFocus={() => setIsSalaryFocused(true)}
-            keyboardType="decimal-pad"
-            placeholder="请输入月薪"
-            placeholderTextColor="#666"
-            caretHidden={!isSalaryFocused}
-          />
-        </View>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -540,7 +623,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3, // Android 阴影效果
+    elevation: 3, // Android 阴影果
   },
   // 日期文本样式
   dayText: {
@@ -683,5 +766,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#00999B", // 使用主题色
     fontWeight: "500",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
